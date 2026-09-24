@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<title>🏆 FANTASY CS2 — v12.2</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+  <!-- ЭКРАН АВТОРИЗАЦИИ -->
+  <div id="auth-screen" class="auth">
+    <div class="auth-box">
+      <div class="auth-logo">FANTASY CS2</div>
+      <div class="auth-sub">Соревнование аналитиков</div>
+      <div class="auth-tabs">
+        <div class="auth-tab active" data-tab="login">Вход</div>
+        <div class="auth-tab" data-tab="register">Регистрация</div>
+      </div>
+      <div id="login-form">
+        <div class="auth-field"><label>Логин</label><input type="text" id="login-user" autocomplete="off"></div>
+        <div class="auth-field"><label>Пароль</label><input type="password" id="login-pass"></div>
+        <button class="auth-btn" onclick="doLogin()">ВОЙТИ</button>
+      </div>
+      <div id="register-form" class="hidden">
+        <div id="reg-step1">
+          <div class="auth-field"><label>Логин</label><input type="text" id="reg-user" autocomplete="off"></div>
+          <div class="auth-field"><label>Пароль</label><input type="password" id="reg-pass"></div>
+          <div class="auth-field"><label>Реферальный код (если есть)</label><input type="text" id="reg-ref" autocomplete="off"></div>
+          <div class="captcha-box"><span class="captcha-question" id="captcha-q">Сколько будет 3 + 4?</span><div class="captcha-answer"><input type="text" id="captcha-a" placeholder="Ответ" autocomplete="off"></div></div>
+          <button class="auth-btn" style="margin-top:14px;" onclick="startTGVerify()">ПРОДОЛЖИТЬ</button>
+        </div>
+        <div id="reg-step2" class="hidden">
+          <div class="tg-verify"><div class="tg-hint">Код для @FantasyCS2Bot:</div><div class="tg-code" id="tg-code">----</div></div>
+          <div class="auth-field"><label>Код от бота</label><input type="text" id="reg-tgcode" placeholder="6 цифр"></div>
+          <div class="auth-info">💡 Демо: любые 6 цифр (например, 123456).</div>
+          <button class="auth-btn" style="margin-top:14px;" onclick="finishRegister()">ЗАВЕРШИТЬ</button>
+          <button class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="backToStep1()">← Назад</button>
+        </div>
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+    </div>
+  </div>
+
+  <!-- ГЛАВНЫЙ ЭКРАН -->
+  <div id="main-screen" class="hidden">
+    <div class="header">
+      <div class="header-left">
+        <div class="logo" onclick="goHome()">🏆 FANTASY CS2</div>
+        <div class="user-badge" id="header-user"><span class="tg-icon"></span><span id="header-username">user</span></div>
+        <div class="admin-badge hidden" id="header-admin">👑 АДМИН</div>
+        <div class="streak-badge hidden" id="header-streak">🔥 0</div>
+      </div>
+      <div class="header-right">
+        <div class="elo-badge" onclick="goToElo()">
+          <div class="elo-icon" id="header-elo-icon">🥈</div>
+          <div><div class="elo-label">ELO · Рейтинг</div><div class="elo-value" id="header-elo-value">1000</div></div>
+        </div>
+        <div class="pill" id="points-pill">
+          <div class="pill-label">🟡 Очки</div>
+          <div class="pill-value gold" id="header-points">0</div>
+          <div class="pill-tooltip">
+            <div class="pill-tooltip-row"><span>📅 Ежедневная</span><span id="tt-daily">0</span></div>
+            <div class="pill-tooltip-row"><span>📆 Недельная</span><span id="tt-weekly">0</span></div>
+            <div class="pill-tooltip-row"><span>🗓️ Месячная</span><span id="tt-monthly">0</span></div>
+          </div>
+        </div>
+        <div class="pill hidden" id="header-rub-pill" onclick="openWithdrawModal()">
+          <div class="pill-label">Баланс ₽</div>
+          <div class="pill-value green" id="header-rub">0</div>
+        </div>
+        <button class="btn btn-ghost" onclick="logout()">Выйти</button>
+      </div>
+    </div>
+
+    <div class="nav" id="nav-bar">
+      <button class="nav-btn active" data-page="matches">🎮 Матчи</button>
+      <button class="nav-btn" data-page="live">📺 Live</button>
+      <button class="nav-btn" data-page="league">🏆 Лиги</button>
+      <button class="nav-btn" data-page="elo">🎖️ Рейтинг ELO</button>
+      <button class="nav-btn" data-page="wheel">🎡 Колесо</button>
+      <button class="nav-btn" data-page="shop">🎁 Магазин</button>
+      <button class="nav-btn" data-page="profile">👤 Профиль</button>
+      <button class="nav-btn" data-page="faq">❓ FAQ</button>
+      <button class="nav-btn" data-page="reviews">💬 Отзывы</button>
+      <button class="nav-btn hidden" id="admin-tab" data-page="admin">⚙️ Админка</button>
+    </div>
+
+    <div id="content"></div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО -->
+<div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
+
+<!-- ПРАЗДНИЧНАЯ АНИМАЦИЯ -->
+<div class="celebration-overlay" id="celebration-overlay"></div>
+
+<!-- РУЛЕТКА КЕЙСА -->
+<div class="case-roulette-overlay" id="case-roulette-overlay">
+  <div class="case-roulette-title" id="case-roulette-title">ОТКРЫТИЕ КЕЙСА</div>
+  <div class="case-roulette-window"><div class="case-roulette-track" id="case-roulette-track"></div><div class="case-roulette-pointer"></div></div>
+  <div class="case-roulette-status" id="case-roulette-status">...</div>
+</div>
+
+<div class="case-prize-reveal" id="case-prize-reveal"><div class="case-prize-reveal-box" id="case-prize-reveal-box"></div></div>
+
+<!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (порядок важен!) -->
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/achievements.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/matches.js"></script>
+<script src="js/live.js"></script>
+<script src="js/leagues.js"></script>
+<script src="js/elo.js"></script>
+<script src="js/wheel.js"></script>
+<script src="js/shop.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/withdrawals.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/faq.js"></script>
+<script src="js/reviews.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
