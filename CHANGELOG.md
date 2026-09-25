@@ -1,14 +1,47 @@
-
----
-
-## 📄 Файл 2 — `CHANGELOG.md`
-
-```markdown
 # Changelog
 
 Все значимые изменения проекта.
 
-## [v12.3] — 2026-09-25 (текущая)
+## [v12.4] — 2026-09-25 (текущая)
+
+### Добавлено — Backend
+- **PostgreSQL 16.15** + БД `fantasy_cs2`
+- **Схема из 10 таблиц:** `users`, `matches`, `predictions`, `withdrawals`, `leagues`, `league_points`, `chat_messages`, `reviews`, `achievements`, `notifications`
+- **Node.js + Express** сервер на `http://localhost:3000`
+- **Подключение к PostgreSQL** через пул `pg`
+- **JWT-авторизация** (`jsonwebtoken`) с мидлваром `authRequired`, `adminRequired`, `authOptional`
+- **bcrypt** для хэширования паролей
+
+### API — Авторизация
+- `POST /api/auth/register` — регистрация с проверкой fingerprint и реферального кода
+- `POST /api/auth/login` — вход, выдача JWT
+- `GET /api/auth/me` — текущий пользователь по токену
+
+### API — Матчи
+- `GET /api/matches` — список с фильтрами `status`, `limit`, `offset`
+- `GET /api/matches/:id` — один матч
+- `POST /api/matches` — создать (только админ)
+- `PUT /api/matches/:id` — обновить (только админ)
+- `DELETE /api/matches/:id` — удалить (только админ)
+
+### API — Прогнозы
+- `POST /api/predictions` — сделать прогноз (только до начала матча)
+- `GET /api/predictions/my` — мои прогнозы с JOIN на матчи
+- `GET /api/predictions/match/:matchId` — прогнозы на матч (только админ)
+
+### API — Прочее
+- `GET /api/health` — проверка подключения к БД
+
+### Документация
+- `CONTEXT.md` — переработан (v12.4, статус бэкенда, план следующих сессий)
+- `README.md` — добавлена секция «Быстрый старт», таблица API
+- `.gitignore` — добавлены `.env`, `node_modules/`
+
+### Исправлено
+- `schema.sql` пересохранён в UTF-8 (была проблема с WIN1251)
+- Дубликаты и ошибки в `shop.js` при вставке патчей — устранены
+
+## [v12.3] — 2026-09-25
 
 ### Добавлено
 - **Кейсы: превью-модалка перед открытием** (`showCasePreview`) — со списком возможных призов и редкостями, без шансов
@@ -45,9 +78,8 @@
 ### Исправлено
 - 🔴 Авторизация (убрана перезапись `enterGame`)
 - 🔴 Админ сохраняется в `users` при логине
-- 🔴 `adminAccrue` работает для админа (было — только для игроков)
+- 🔴 `adminAccrue` работает для админа
 - 🔴 `loadLeagueSettings` защищён от пустого объекта
-- 🔴 Дублирование `pendingRegister` (убрано из `auth.js`)
 
 ### Изменено
 - Все тексты FAQ переписаны живым языком
