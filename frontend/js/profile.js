@@ -7,6 +7,7 @@
 // ============================================================
 function renderProfilePage() {
   const userCosmetics = state.cosmetics || [];
+  const activeBadges = state.activeBadges || {};
   const avatar = AVATARS.find(a => a.id === state.avatar) || AVATARS[0];
   const frame = FRAMES.find(f => f.id === state.frame) || FRAMES[0];
   const rank = getEloRank(state.elo || ELO_START);
@@ -22,10 +23,18 @@ function renderProfilePage() {
   else if (state.activeNickEffect === 'electric') nameClass += ' electric-nick';
   else if (state.activeNickEffect === 'crystal_effect') nameClass += ' crystal-nick';
   else if (state.activeNickEffect === 'rainbow_effect') nameClass += ' anim-nick';
-  else if (userCosmetics.includes('vip')) nameClass += ' vip-nick';
+  else if (activeBadges.vip && userCosmetics.includes('vip')) nameClass += ' vip-nick';
 
   const hasVip = userCosmetics.includes('vip');
   const activeWithdrawals = (state.withdrawals || []).filter(w => w.status === 'pending').length;
+
+  // Собираем значки рядом с ником
+  const badgesHtml = [
+    activeBadges.vip && hasVip ? ' ⭐' : '',
+    activeBadges.crown && userCosmetics.includes('crown') ? ' 👑' : '',
+    activeBadges.badge_hunter && userCosmetics.includes('badge_hunter') ? ' 🎯' : '',
+    activeBadges.badge_king && userCosmetics.includes('badge_king') ? ' ♛' : '',
+  ].join('');
 
   return `
     <div class="profile-header">
@@ -33,7 +42,7 @@ function renderProfilePage() {
         <div class="${avatarClass}"><span>${avatar.icon}</span></div>
       </div>
       <div class="profile-info">
-        <div class="${nameClass}">${state.user}${hasVip ? ' ⭐' : ''}</div>
+        <div class="${nameClass}">${state.user}${badgesHtml}</div>
         <div class="profile-rank-badge" style="color:${rank.color};border:1px solid ${rank.color};">
           ${rank.icon} ${rank.name} · ${state.elo || ELO_START} ELO
         </div>
@@ -79,8 +88,9 @@ function renderProfileMain() {
   const activeBoosters = (state.bonuses?.boosters || []).filter(b => !b.usedOn);
   const activeInsurances = (state.bonuses?.insurance || []).filter(i => !i.usedOn);
   const pendingCases = state.bonuses?.pendingCases || [];
+  const skins = state.inventory || [];
 
-  const hasInventory = activeBoosters.length || activeInsurances.length || pendingCases.length;
+  const hasInventory = activeBoosters.length || activeInsurances.length || pendingCases.length || skins.length;
 
   return `
     <!-- СТАТИСТИКА -->
@@ -125,6 +135,16 @@ function renderProfileMain() {
             <div style="background:rgba(255,215,0,0.15);border:1px solid #ffd700;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
               <span>📦 ${c === 'small' ? 'Малый' : c === 'medium' ? 'Средний' : 'Большой'} кейс</span>
               <button onclick="openPendingCase(${idx})" style="background:#ffd700;color:#1a0a2e;border:none;border-radius:6px;padding:6px 14px;font-weight:800;cursor:pointer;font-family:inherit;">Открыть</button>
+            </div>
+          `).join('')}
+
+          ${skins.map(s => `
+            <div style="background:linear-gradient(135deg,rgba(255,100,0,0.12),rgba(124,58,237,0.12));border:1px solid #ff6b00;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;">
+              <div style="font-size:32px;">${s.icon}</div>
+              <div style="flex:1;">
+                <div style="font-weight:800;font-size:13px;color:#e6edf7;">${s.name}</div>
+                <div style="font-size:10px;color:#8b95a8;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">${s.rarity} · ${s.price} 🟡</div>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -404,12 +424,15 @@ function copyRefCode() {
     toast('⚠️ Не удалось скопировать. Скопируйте вручную.', '#ef4444');
   });
 }
+
 // ============================================================
-//  ВКЛАДКА «КАСТОМИЗАЦИЯ» — аватар, рамка, эффект ника
+//  ВКЛАДКА «КАСТОМИЗАЦИЯ» — аватар, рамка, эффекты, значки
 // ============================================================
 function renderProfileCustomize() {
   const userCosmetics = state.cosmetics || [];
+  const activeBadges = state.activeBadges || {};
   const nickEffects = COSMETICS.filter(c => c.category === 'nick_effect');
+  const badges = COSMETICS.filter(c => c.category === 'badge' || c.category === 'crown' || c.category === 'vip');
 
   return `
     <!-- АВАТАР -->
@@ -442,6 +465,29 @@ function renderProfileCustomize() {
       </div>
     </div>
 
+    <!-- ЗНАЧКИ -->
+    <div class="panel">
+      <div class="panel-title">🏅 Значки</div>
+      <div style="font-size:12px;color:#8b95a8;margin-bottom:8px;">Значки показываются рядом с вашим ником в чате и профиле. Можно включить несколько сразу — или все выключить.</div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${badges.map(b => {
+          const owned = userCosmetics.includes(b.id);
+          const isActive = !!activeBadges[b.id];
+          return `<div class="boost-activate-card ${isActive ? 'activated' : ''}">
+            <div class="boost-activate-icon">${b.icon}</div>
+            <div class="boost-activate-info">
+              <div class="boost-activate-title">${b.name}</div>
+              <div class="boost-activate-desc">${owned ? (isActive ? '✓ Показывается в чате и профиле' : 'Куплено, выключено') : `${b.points} 🟡 — пока не куплено`}</div>
+            </div>
+            ${owned
+              ? `<button class="boost-activate-toggle ${isActive ? '' : 'off'}" onclick="toggleBadge('${b.id}')">${isActive ? '✓ ВКЛ' : 'Включить'}</button>`
+              : `<button class="boost-activate-toggle off" onclick="buyCosmetic('${b.id}')">Купить (${b.points} 🟡)</button>`}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
     <!-- ЭФФЕКТЫ НИКА -->
     <div class="panel">
       <div class="panel-title">✨ Эффекты никнейма</div>
@@ -463,16 +509,14 @@ function renderProfileCustomize() {
           </div>`;
         }).join('')}
 
-        ${userCosmetics.includes('vip') ? `
-          <div class="boost-activate-card ${state.activeNickEffect === null ? 'activated' : ''}">
-            <div class="boost-activate-icon">⭐</div>
-            <div class="boost-activate-info">
-              <div class="boost-activate-title">Обычный ник + VIP-значок</div>
-              <div class="boost-activate-desc">Стандартный ник с золотой звёздочкой</div>
-            </div>
-            <button class="boost-activate-toggle ${state.activeNickEffect === null ? '' : 'off'}" onclick="toggleNickEffect(null)">${state.activeNickEffect === null ? '✓ ВКЛ' : 'Включить'}</button>
+        <div class="boost-activate-card ${state.activeNickEffect === null ? 'activated' : ''}">
+          <div class="boost-activate-icon">👤</div>
+          <div class="boost-activate-info">
+            <div class="boost-activate-title">Обычный ник</div>
+            <div class="boost-activate-desc">Стандартный ник без эффектов</div>
           </div>
-        ` : ''}
+          <button class="boost-activate-toggle ${state.activeNickEffect === null ? '' : 'off'}" onclick="toggleNickEffect(null)">${state.activeNickEffect === null ? '✓ ВКЛ' : 'Включить'}</button>
+        </div>
       </div>
     </div>
   `;
@@ -503,6 +547,18 @@ function toggleNickEffect(effectId) {
     state.activeNickEffect = effectId;
     toast('✨ Эффект ника применён', '#10b981');
   }
+  renderPage('profile');
+  saveState();
+}
+
+// ============================================================
+//  ЗНАЧКИ — вкл/выкл
+// ============================================================
+function toggleBadge(badgeId) {
+  if (!state.activeBadges) state.activeBadges = {};
+  state.activeBadges[badgeId] = !state.activeBadges[badgeId];
+  const isOn = state.activeBadges[badgeId];
+  toast(isOn ? `🏅 Значок включён` : `⏸️ Значок выключен`, isOn ? '#10b981' : '#8b95a8');
   renderPage('profile');
   saveState();
 }

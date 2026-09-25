@@ -124,8 +124,8 @@ function buyBooster(id) {
     toast('❌ Недостаточно очков', '#ef4444');
     return;
   }
-  state.fantasyPoints -= b.points;
   state.bonuses.boosters.push({ value: b.value, usedOn: null, activated: false });
+  state.fantasyPoints -= b.points;
   toast(`✅ ${b.name} куплен!`, '#10b981');
   updateHeader();
   renderPage('shop');
@@ -142,8 +142,8 @@ function buyInsurance(id) {
     toast('❌ Недостаточно очков', '#ef4444');
     return;
   }
-  state.fantasyPoints -= ins.points;
   state.bonuses.insurance.push({ type: ins.type, usedOn: null, activated: false });
+  state.fantasyPoints -= ins.points;
   toast(`✅ ${ins.name} куплена!`, '#10b981');
   updateHeader();
   renderPage('shop');
@@ -195,13 +195,217 @@ function buyFrame(id) {
   renderPage('shop');
   saveState();
 }
+
 // ============================================================
-//  ОТКРЫТИЕ КЕЙСА — запуск рулетки
+//  ТАБЛИЦЫ ПРИЗОВ КЕЙСОВ (без "Пусто")
+// ============================================================
+const CASE_TABLES = {
+  small: [
+    { chance: 25,   prize: { type: 'points',    icon: '🟡', name: '+20 очков',      rarity: 'common',    amount: 20 } },
+    { chance: 23,   prize: { type: 'points',    icon: '🟡', name: '+40 очков',      rarity: 'common',    amount: 40 } },
+    { chance: 19,   prize: { type: 'points',    icon: '🟡', name: '+70 очков',      rarity: 'rare',      amount: 70 } },
+    { chance: 13,   prize: { type: 'booster',   icon: '🎯', name: 'Бустер +10%',    rarity: 'rare',      value: 10, count: 1 } },
+    { chance: 7,    prize: { type: 'booster',   icon: '🎯', name: 'Бустер +10% ×2', rarity: 'epic',      value: 10, count: 2 } },
+    { chance: 9,    prize: { type: 'insurance', icon: '🛡️', name: 'Страховка',      rarity: 'rare',      insType: 'regular', count: 1 } },
+    { chance: 4,    prize: { type: 'insurance', icon: '🛡️', name: 'Страховка ×2',   rarity: 'epic',      insType: 'regular', count: 2 } },
+    { chance: 0.2,  prize: { type: 'skin',      icon: '🔫', name: 'Скин (common)',  rarity: 'legendary', skinRarity: 'common' } },
+  ],
+  medium: [
+    { chance: 22,   prize: { type: 'points',    icon: '🟡', name: '+50 очков',        rarity: 'common',    amount: 50 } },
+    { chance: 20.5, prize: { type: 'points',    icon: '🟡', name: '+100 очков',       rarity: 'common',    amount: 100 } },
+    { chance: 17,   prize: { type: 'points',    icon: '🟡', name: '+180 очков',       rarity: 'rare',      amount: 180 } },
+    { chance: 10,   prize: { type: 'booster',   icon: '🎯', name: 'Бустер +20%',      rarity: 'rare',      value: 20, count: 1 } },
+    { chance: 7,    prize: { type: 'booster',   icon: '🎯', name: 'Бустер +20% ×2',   rarity: 'epic',      value: 20, count: 2 } },
+    { chance: 5,    prize: { type: 'booster',   icon: '🎯', name: 'Бустер +30%',      rarity: 'epic',      value: 30, count: 1 } },
+    { chance: 3,    prize: { type: 'booster',   icon: '🎯', name: 'Бустер +30% ×2',   rarity: 'legendary', value: 30, count: 2 } },
+    { chance: 6.5,  prize: { type: 'insurance', icon: '🛡️', name: 'Страховка ×2',     rarity: 'epic',      insType: 'regular', count: 2 } },
+    { chance: 4,    prize: { type: 'insurance', icon: '🛡️', name: 'Страховка ×3',     rarity: 'epic',      insType: 'regular', count: 3 } },
+    { chance: 4.5,  prize: { type: 'case',      icon: '📦', name: 'Малый кейс',       rarity: 'epic',      caseType: 'small' } },
+    { chance: 0.5,  prize: { type: 'skin',      icon: '🔫', name: 'Скин (rare)',      rarity: 'legendary', skinRarity: 'rare' } },
+  ],
+  large: [
+    { chance: 18,   prize: { type: 'points',    icon: '🟡', name: '+150 очков',          rarity: 'common',    amount: 150 } },
+    { chance: 16,   prize: { type: 'points',    icon: '🟡', name: '+300 очков',          rarity: 'common',    amount: 300 } },
+    { chance: 12,   prize: { type: 'points',    icon: '🟡', name: '+500 очков',          rarity: 'rare',      amount: 500 } },
+    { chance: 6,    prize: { type: 'points',    icon: '🟡', name: '+800 очков',          rarity: 'epic',      amount: 800 } },
+    { chance: 8,    prize: { type: 'booster',   icon: '🎯', name: 'Бустер +30% ×2',     rarity: 'epic',      value: 30, count: 2 } },
+    { chance: 6,    prize: { type: 'booster',   icon: '🎯', name: 'Бустер +30% ×3',     rarity: 'epic',      value: 30, count: 3 } },
+    { chance: 3,    prize: { type: 'booster',   icon: '🎯', name: 'Бустер +30% ×5',     rarity: 'legendary', value: 30, count: 5 } },
+    { chance: 6,    prize: { type: 'insurance', icon: '💎', name: 'Премиум-страховка ×2', rarity: 'epic',    insType: 'premium', count: 2 } },
+    { chance: 4,    prize: { type: 'insurance', icon: '💎', name: 'Премиум-страховка ×3', rarity: 'epic',    insType: 'premium', count: 3 } },
+    { chance: 6,    prize: { type: 'case',      icon: '💎', name: 'Средний кейс ×2',    rarity: 'epic',      caseType: 'medium', count: 2 } },
+    { chance: 3,    prize: { type: 'case',      icon: '👑', name: 'Большой кейс',       rarity: 'legendary', caseType: 'large', count: 1 } },
+    { chance: 2,    prize: { type: 'skin',      icon: '🔫', name: 'Скин (epic)',        rarity: 'legendary', skinRarity: 'epic' } },
+  ],
+};
+
+// ============================================================
+//  ВЫБОР ПРИЗА ПО ВЕСАМ
+// ============================================================
+function pickCasePrize(caseType) {
+  const table = CASE_TABLES[caseType];
+  if (!table) return { type: 'points', icon: '🟡', name: '+10 очков', rarity: 'common', amount: 10 };
+
+  const total = table.reduce((s, row) => s + row.chance, 0);
+  let roll = Math.random() * total;
+
+  for (const row of table) {
+    roll -= row.chance;
+    if (roll <= 0) {
+      const p = { ...row.prize };
+      if (p.type === 'skin') {
+        const pool = CASE_SKINS[p.skinRarity] || [];
+        const skin = pool[Math.floor(Math.random() * pool.length)];
+        p.skin = skin;
+        p.name = skin.name;
+        p.icon = skin.icon;
+      }
+      return p;
+    }
+  }
+  return { ...table[0].prize };
+}
+
+// ============================================================
+//  ПРИМЕНЕНИЕ ПРИЗА
+// ============================================================
+function applyCasePrize(prize) {
+  if (!prize) return;
+  const count = prize.count || 1;
+
+  switch (prize.type) {
+    case 'points':
+      state.fantasyPoints = (state.fantasyPoints || 0) + prize.amount;
+      toast(`🟡 +${prize.amount} очков`, '#ffd700');
+      break;
+
+    case 'booster':
+      state.bonuses = state.bonuses || {};
+      state.bonuses.boosters = state.bonuses.boosters || [];
+      for (let i = 0; i < count; i++) {
+        state.bonuses.boosters.push({ value: prize.value, usedOn: null, activated: false });
+      }
+      toast(`🎯 Бустер +${prize.value}%${count > 1 ? ' ×' + count : ''} в инвентаре`, '#10b981');
+      break;
+
+    case 'insurance':
+      state.bonuses = state.bonuses || {};
+      state.bonuses.insurance = state.bonuses.insurance || [];
+      for (let i = 0; i < count; i++) {
+        state.bonuses.insurance.push({ type: prize.insType || 'regular', usedOn: null, activated: false });
+      }
+      toast(`🛡️ ${prize.insType === 'premium' ? 'Премиум-страховка' : 'Страховка'}${count > 1 ? ' ×' + count : ''} в инвентаре`, '#a78bfa');
+      break;
+
+    case 'case':
+      state.bonuses = state.bonuses || {};
+      state.bonuses.pendingCases = state.bonuses.pendingCases || [];
+      for (let i = 0; i < count; i++) {
+        state.bonuses.pendingCases.push(prize.caseType);
+      }
+      toast(`📦 ${prize.name} в инвентаре! Откройте в профиле.`, '#a78bfa');
+      break;
+
+    case 'skin':
+      state.inventory = state.inventory || [];
+      if (prize.skin) {
+        state.inventory.push({ ...prize.skin, obtainedAt: now() });
+        toast(`🔫 ВЫПАЛ СКИН: ${prize.skin.name}!`, '#ffd700');
+      }
+      break;
+  }
+}
+
+// ============================================================
+//  ОТКРЫТИЕ КЕЙСА — сначала превью со списком призов
 // ============================================================
 function openCase(type) {
   const prices = { small: 50, medium: 120, large: 350 };
   const price = prices[type];
+
+  // Показываем превью модалку
+  showCasePreview(type, price);
+}
+
+// ============================================================
+//  ПРЕВЬЮ КЕЙСА — список возможных призов, без шансов
+// ============================================================
+function showCasePreview(type, price) {
+  const caseNames = { small: '📦 Малый кейс', medium: '💎 Средний кейс', large: '👑 Большой кейс' };
+  const table = CASE_TABLES[type] || [];
+  const rarityLabels = { common: 'Обычное', rare: 'Редкое', epic: 'Эпическое', legendary: 'ЛЕГЕНДАРНОЕ' };
+  const rarityColors = { common: '#88ddff', rare: '#a78bfa', epic: '#ffd700', legendary: '#ffd700' };
+
+  // Собираем уникальные призы — схлопываем одинаковые по названию
+  const uniquePrizes = {};
+  table.forEach(row => {
+    const p = row.prize;
+    let name = p.name;
+    let icon = p.icon;
+
+    // Для скинов — показываем все возможные из пула
+    if (p.type === 'skin') {
+      const pool = CASE_SKINS[p.skinRarity] || [];
+      pool.forEach(skin => {
+        const key = skin.id;
+        if (!uniquePrizes[key]) {
+          uniquePrizes[key] = { name: skin.name, icon: skin.icon, rarity: p.rarity };
+        }
+      });
+      return;
+    }
+
+    if (!uniquePrizes[name]) {
+      uniquePrizes[name] = { name, icon, rarity: p.rarity };
+    }
+  });
+
+  const prizesArray = Object.values(uniquePrizes);
+
+  // Сортируем по редкости: legendary → epic → rare → common
+  const rarityOrder = { legendary: 0, epic: 1, rare: 2, common: 3 };
+  prizesArray.sort((a, b) => rarityOrder[a.rarity] - rarityOrder[b.rarity]);
+
+  const modal = document.getElementById('modal-bg');
+  const modalBox = document.getElementById('modal');
+
+  modalBox.innerHTML = `
+    <h2 style="text-align:center;margin-bottom:6px;">${caseNames[type]}</h2>
+    <div style="text-align:center;font-size:13px;color:#8b95a8;margin-bottom:18px;">
+      Цена: <strong style="color:#ffd700;">${price} 🟡</strong>
+    </div>
+
+    <div style="font-size:12px;color:#8b95a8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">
+      Возможные призы
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto;margin-bottom:18px;">
+      ${prizesArray.map(p => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0f1420;border-left:3px solid ${rarityColors[p.rarity]};border-radius:8px;">
+          <div style="font-size:22px;flex-shrink:0;">${p.icon}</div>
+          <div style="flex:1;font-size:13px;font-weight:600;">${p.name}</div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${rarityColors[p.rarity]};font-weight:800;">${rarityLabels[p.rarity]}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-ghost" style="flex:1;" onclick="closeModal()">Отмена</button>
+      <button class="btn btn-gold" style="flex:1;" onclick="confirmOpenCase('${type}', ${price})">
+        Открыть за ${price} 🟡
+      </button>
+    </div>
+  `;
+
+  modal.classList.add('show');
+}
+
+// ============================================================
+//  ПОДТВЕРЖДЕНИЕ ОТКРЫТИЯ — списываем очки, крутим рулетку
+// ============================================================
+function confirmOpenCase(type, price) {
   if ((state.fantasyPoints || 0) < price) {
+    closeModal();
     toast('❌ Недостаточно очков', '#ef4444');
     return;
   }
@@ -210,14 +414,39 @@ function openCase(type) {
   state.casesOpened = (state.casesOpened || 0) + 1;
   state.activityActions = (state.activityActions || 0) + 1;
 
-  // Выбираем приз заранее
   const prize = pickCasePrize(type);
 
-  // Показываем рулетку → по завершении применяем приз
+  closeModal();
+
   showCaseRoulette(type, prize, () => {
     applyCasePrize(prize);
     updateHeader();
     renderPage('shop');
+    checkAchievements();
+    checkReferralProgress();
+    saveState();
+  });
+}
+
+// ============================================================
+//  ОТКРЫТИЕ ОТЛОЖЕННОГО КЕЙСА (из инвентаря профиля)
+// ============================================================
+function openPendingCase(idx) {
+  if (!state.bonuses || !state.bonuses.pendingCases) return;
+  const type = state.bonuses.pendingCases[idx];
+  if (!type) return;
+
+  state.bonuses.pendingCases.splice(idx, 1);
+  saveState();
+
+  const prize = pickCasePrize(type);
+  state.casesOpened = (state.casesOpened || 0) + 1;
+  state.activityActions = (state.activityActions || 0) + 1;
+
+  showCaseRoulette(type, prize, () => {
+    applyCasePrize(prize);
+    updateHeader();
+    renderPage('profile');
     checkAchievements();
     checkReferralProgress();
     saveState();
@@ -258,23 +487,20 @@ function showCaseRoulette(caseType, winPrize, onComplete) {
   const { items, winIdx } = buildRouletteItems(caseType, winPrize);
   const rarityClass = { common: 'common', rare: 'rare', epic: 'epic', legendary: 'legendary' };
 
-  // Заполняем ленту
   track.innerHTML = items.map(it => `
     <div class="case-roulette-item ${rarityClass[it.rarity] || 'common'}">
       <div class="case-roulette-item-icon">${it.icon}</div>
-      <div class="case-roulette-item-name">${it.name}${it.amount ? ' ×' + it.amount : ''}</div>
+      <div class="case-roulette-item-name">${it.name}</div>
     </div>
   `).join('');
 
   overlay.classList.add('show');
 
-  // Вычисляем смещение
   const itemWidth = 148;
   const trackContainerWidth = document.querySelector('.case-roulette-window').offsetWidth;
   const centerOffset = trackContainerWidth / 2 - 70;
   const targetTranslate = -(winIdx * itemWidth) + centerOffset;
 
-  // Сброс и запуск
   track.style.transition = 'none';
   track.style.transform = `translateX(0)`;
   void track.offsetWidth;
@@ -283,7 +509,6 @@ function showCaseRoulette(caseType, winPrize, onComplete) {
   track.style.transition = 'transform 7s cubic-bezier(0.15, 0.7, 0.15, 1)';
   track.style.transform = `translateX(${targetTranslate + randomOffset}px)`;
 
-  // Обратный отсчёт
   let timeLeft = 7;
   const statusInterval = setInterval(() => {
     timeLeft--;
@@ -291,7 +516,6 @@ function showCaseRoulette(caseType, winPrize, onComplete) {
     else status.textContent = '✨ Открываем...';
   }, 1000);
 
-  // Показ результата
   setTimeout(() => {
     clearInterval(statusInterval);
     overlay.classList.remove('show');
@@ -303,13 +527,12 @@ function showCaseRoulette(caseType, winPrize, onComplete) {
 
     revealBox.innerHTML = `
       <div class="case-prize-icon" style="color:${rarityColors[winPrize.rarity]};">${winPrize.icon}</div>
-      <div class="case-prize-title" style="color:${rarityColors[winPrize.rarity]};">${winPrize.name}${winPrize.amount ? ' × ' + winPrize.amount : ''}</div>
+      <div class="case-prize-title" style="color:${rarityColors[winPrize.rarity]};">${winPrize.name}</div>
       <div class="case-prize-rarity" style="background:${rarityColors[winPrize.rarity]};color:${winPrize.rarity === 'common' || winPrize.rarity === 'rare' ? '#0a0e1a' : '#1a0a2e'};">${rarityLabels[winPrize.rarity]}</div>
       <button class="btn btn-primary" style="width:100%;min-height:48px;" onclick="closeCaseReveal()">🎉 Забрать</button>
     `;
     reveal.classList.add('show');
 
-    // Конфетти для epic/legendary
     if (winPrize.rarity === 'epic' || winPrize.rarity === 'legendary') {
       const count = winPrize.rarity === 'legendary' ? 120 : 60;
       for (let i = 0; i < count; i++) {

@@ -2,28 +2,34 @@
 //  ЧАТ — v12.2
 // ============================================================
 
-// Рендер всех сообщений чата (с учётом эффектов ника)
+// Рендер всех сообщений чата (с учётом эффектов ника и активных значков)
 function renderChatMessages() {
   const users = loadUsers();
   return chatMessages.map(m => {
     const ad = users[m.author] || {};
     const cos = ad.cosmetics || [];
-    const isVip = cos.includes('vip');
-    const isCrown = cos.includes('crown');
-    const isBH = cos.includes('badge_hunter');
-    const isBK = cos.includes('badge_king');
+    const activeBadges = ad.activeBadges || {};
     const ne = ad.activeNickEffect;
     const isMe = m.author === currentUser;
     const time = new Date(m.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
+    // Классы ника
     let ac = 'chat-msg-author';
     if (ne === 'fire_effect') ac += ' fire';
     else if (ne === 'animnick' || ne === 'rainbow_effect') ac += ' anim';
     else if (ne === 'electric') ac += ' electric';
     else if (ne === 'crystal_effect') ac += ' anim';
 
+    // Значки рядом с ником — только активные
+    const badges = [
+      (activeBadges.vip && cos.includes('vip')) ? ' ⭐' : '',
+      (activeBadges.crown && cos.includes('crown')) ? ' 👑' : '',
+      (activeBadges.badge_hunter && cos.includes('badge_hunter')) ? ' 🎯' : '',
+      (activeBadges.badge_king && cos.includes('badge_king')) ? ' ♛' : '',
+    ].join('');
+
     return `<div class="chat-msg ${isMe ? 'me' : ''}">
-      <div class="${ac}">${m.author}${isVip ? ' ⭐' : ''}${isCrown ? ' 👑' : ''}${isBH ? ' 🎯' : ''}${isBK ? ' ♛' : ''}</div>
+      <div class="${ac}">${m.author}${badges}</div>
       <div class="chat-msg-text">${escapeHtml(m.text)}</div>
       <div class="chat-msg-time">${time}</div>
     </div>`;

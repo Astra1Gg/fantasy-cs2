@@ -183,6 +183,33 @@ const COSMETICS = [
 ];
 
 // ============================================================
+//  СКИНЫ CS2 — выпадают из кейсов, копятся в инвентаре
+// ============================================================
+const CASE_SKINS = {
+  common: [
+    { id: 'skin_ak_slate',        name: 'AK-47 | Slate',              icon: '⬛', rarity: 'common', price: 60 },
+    { id: 'skin_m4_guardian',     name: 'M4A1-S | Guardian',          icon: '🟦', rarity: 'common', price: 75 },
+    { id: 'skin_awp_worm',        name: 'AWP | Worm God',             icon: '🟩', rarity: 'common', price: 90 },
+    { id: 'skin_glock_weasel',    name: 'Glock-18 | Weasel',          icon: '🟨', rarity: 'common', price: 70 },
+    { id: 'skin_usp_blueprint',   name: 'USP-S | Blueprint',          icon: '🔵', rarity: 'common', price: 85 },
+  ],
+  rare: [
+    { id: 'skin_ak_redline',      name: 'AK-47 | Redline',            icon: '🔴', rarity: 'rare',   price: 350 },
+    { id: 'skin_m4_cyrex',        name: 'M4A1-S | Cyrex',             icon: '🟥', rarity: 'rare',   price: 400 },
+    { id: 'skin_awp_asiimov',     name: 'AWP | Asiimov',              icon: '🟠', rarity: 'rare',   price: 600 },
+    { id: 'skin_deagle_code_red', name: 'Desert Eagle | Code Red',    icon: '🟥', rarity: 'rare',   price: 450 },
+    { id: 'skin_ak_asiimov',      name: 'AK-47 | Asiimov',            icon: '🟧', rarity: 'rare',   price: 700 },
+  ],
+  epic: [
+    { id: 'skin_awp_hyperbeast',  name: 'AWP | Hyper Beast',          icon: '🐉', rarity: 'epic',   price: 900 },
+    { id: 'skin_ak_fire_serpent', name: 'AK-47 | Fire Serpent',       icon: '🔥', rarity: 'epic',   price: 1300 },
+    { id: 'skin_m4_howl',         name: 'M4A4 | Howl',                icon: '🐺', rarity: 'epic',   price: 2000 },
+    { id: 'skin_awp_medusa',      name: 'AWP | Medusa',               icon: '🐍', rarity: 'epic',   price: 1800 },
+    { id: 'skin_ak_wild_lotus',   name: 'AK-47 | Wild Lotus',         icon: '🌸', rarity: 'epic',   price: 2000 },
+  ],
+};
+
+// ============================================================
 //  КОЛЕСО ФОРТУНЫ — призы с понятными описаниями
 // ============================================================
 const WHEEL_PRIZES = [

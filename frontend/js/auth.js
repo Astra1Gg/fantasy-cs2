@@ -432,3 +432,44 @@ function showRejectedNotification(n) {
     </div>`;
   document.getElementById('modal-bg').classList.add('show');
 }
+// ============================================================
+//  ВХОД/РЕГИСТРАЦИЯ ПО ENTER
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Вход: Enter в поле логина или пароля → doLogin()
+  ['login-user', 'login-pass'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          doLogin();
+        }
+      });
+    }
+  });
+
+  // Регистрация, шаг 1: Enter в логине/пароле/капче → startTGVerify()
+  ['reg-user', 'reg-pass', 'reg-ref', 'captcha-a'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          startTGVerify();
+        }
+      });
+    }
+  });
+
+  // Регистрация, шаг 2: Enter в поле кода → finishRegister()
+  const tgCodeEl = document.getElementById('reg-tgcode');
+  if (tgCodeEl) {
+    tgCodeEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finishRegister();
+      }
+    });
+  }
+});
