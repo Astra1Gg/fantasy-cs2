@@ -6,6 +6,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,10 @@ app.use((req, res, next) => {
   });
   next();
 });
+// ============================================================
+//  ROUTES
+// ============================================================
+app.use('/api/auth', authRoutes);
 
 // ============================================================
 //  HEALTH CHECK
@@ -64,7 +69,10 @@ app.get('/', (req, res) => {
     name: 'Fantasy CS2 API',
     version: '0.1.0',
     endpoints: [
-      'GET /api/health',
+      'GET  /api/health',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'GET  /api/auth/me',
     ],
   });
 });
