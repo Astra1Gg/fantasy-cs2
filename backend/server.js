@@ -7,6 +7,8 @@ const express = require('express');
 const cors = require('cors');
 const db = require('./db');
 const authRoutes = require('./routes/auth');
+const matchesRoutes = require('./routes/matches');
+const predictionsRoutes = require('./routes/predictions');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +36,8 @@ app.use((req, res, next) => {
 //  ROUTES
 // ============================================================
 app.use('/api/auth', authRoutes);
+app.use('/api/matches', matchesRoutes);
+app.use('/api/predictions', predictionsRoutes);
 
 // ============================================================
 //  HEALTH CHECK
@@ -69,10 +73,17 @@ app.get('/', (req, res) => {
     name: 'Fantasy CS2 API',
     version: '0.1.0',
     endpoints: [
-      'GET  /api/health',
-      'POST /api/auth/register',
-      'POST /api/auth/login',
-      'GET  /api/auth/me',
+  'GET    /api/health',
+  'POST   /api/auth/register',
+  'POST   /api/auth/login',
+  'GET    /api/auth/me',
+  'GET    /api/matches',
+  'GET    /api/matches/:id',
+  'POST   /api/matches          (admin)',
+  'PUT    /api/matches/:id      (admin)',
+  'DELETE /api/matches/:id      (admin)',
+  'POST   /api/predictions      (auth)',
+  'GET    /api/predictions/my   (auth)',
     ],
   });
 });
