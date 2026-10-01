@@ -3,10 +3,9 @@
 Веб-платформа для прогнозов на матчи CS2. Игроки угадывают победителя, kills игроков и тотал. За удачные прогнозы — очки, ELO и реальные призовые.
 
 ## 📌 Текущий статус
-- **Версия:** v12.4
-- **Режим:** гибрид — фронт на localStorage, бэкенд на PostgreSQL (в разработке)
-- **Фронт:** готов, задеплоен на Netlify (работает под VPN)
-- **Бэкенд:** локально, API готово для авторизации, матчей, прогнозов
+- **Версия:** v12.5
+- **Фронт:** готов, работает на localStorage (задеплоен на Netlify)
+- **Бэкенд:** **полностью готов** (Node.js + Express + PostgreSQL)
 - **Следующий шаг:** Этап 4 — переключение фронта на API
 
 ## 🛠 Стек
@@ -25,25 +24,20 @@
 
 ### Вариант A — только фронт (прототип)
 
-1. Открой `frontend/index.html` в браузере (лучше — через **Live Server** в VS Code).
+1. Открой `frontend/index.html` через **Live Server**.
 2. Админ: логин `admin`, пароль `admin123`.
-3. Игрок: зарегистрируйся сам.
 
 ### Вариант B — с бэкендом (полная разработка)
 
-**Требуется:**
-- Node.js 18+
-- PostgreSQL 16+
+**Требуется:** Node.js 18+, PostgreSQL 16+.
 
-**1. Установи PostgreSQL и создай БД:**
-
+**1. Создай БД:**
 ```bash
 psql -U postgres -c "CREATE DATABASE fantasy_cs2;"
 psql -U postgres -d fantasy_cs2 -f database/schema.sql
 ```
 
-**2. Настрой `.env`** (создай `backend/.env`):
-
+**2. Настрой `.env`** (`backend/.env`):
 ```env
 PORT=3000
 DB_HOST=localhost
@@ -56,8 +50,7 @@ JWT_EXPIRES_IN=7d
 NODE_ENV=development
 ```
 
-**3. Установи зависимости и запусти:**
-
+**3. Запусти:**
 ```bash
 cd backend
 npm install
@@ -65,12 +58,9 @@ npm run dev
 ```
 
 **4. Проверь:**
-
 ```bash
 curl http://localhost:3000/api/health
 ```
-
-Должен вернуть JSON с `"ok": true`.
 
 ## 📁 Структура
 
@@ -85,10 +75,18 @@ fantasy-cs2/
 │   ├── server.js
 │   ├── db.js
 │   ├── middleware/auth.js
-│   └── routes/
+│   └── routes/                  # 11 роутов
 │       ├── auth.js
+│       ├── profile.js
 │       ├── matches.js
-│       └── predictions.js
+│       ├── predictions.js
+│       ├── shop.js
+│       ├── elo.js
+│       ├── leagues.js
+│       ├── withdrawals.js
+│       ├── admin.js
+│       ├── reviews.js
+│       └── chat.js
 │
 ├── database/
 │   └── schema.sql               # 10 таблиц
@@ -98,30 +96,65 @@ fantasy-cs2/
 └── CONTEXT.md
 ```
 
-## 🎮 Как работает (для игрока)
-1. Регистрация (с капчей и TG-верификацией — пока демо)
-2. Прогнозы на 3 рынка: победитель, kills игрока, тотал
-3. Очки → магазин (бустеры, страховки, кейсы, косметика, значки)
-4. ELO → ранги с наградами
-5. Лиги (ежедневно/недельно/месячно) → реальные призовые
-6. Выводы: СБП/карта/ЮMoney
+## 📡 API (полный список)
 
-## 📡 API (что готово)
+**Auth:**
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 
-| Метод | Endpoint | Auth | Описание |
-|-------|----------|------|----------|
-| GET | `/api/health` | — | Проверка подключения к БД |
-| POST | `/api/auth/register` | — | Регистрация |
-| POST | `/api/auth/login` | — | Вход |
-| GET | `/api/auth/me` | JWT | Текущий пользователь |
-| GET | `/api/matches` | opt | Список матчей |
-| GET | `/api/matches/:id` | opt | Один матч |
-| POST | `/api/matches` | admin | Создать матч |
-| PUT | `/api/matches/:id` | admin | Обновить матч |
-| DELETE | `/api/matches/:id` | admin | Удалить матч |
-| POST | `/api/predictions` | JWT | Сделать прогноз |
-| GET | `/api/predictions/my` | JWT | Мои прогнозы |
-| GET | `/api/predictions/match/:id` | admin | Прогнозы на матч |
+**Profile:**
+- `GET /api/profile/me`
+- `GET /api/profile/:username`
+- `PATCH /api/profile/me`
+- `POST /api/profile/buy-avatar`
+- `POST /api/profile/buy-frame`
+- `POST /api/profile/buy-cosmetic`
+
+**Matches / Predictions:**
+- `GET /api/matches`
+- `GET /api/matches/:id`
+- `POST /api/matches` (admin)
+- `PUT /api/matches/:id` (admin)
+- `DELETE /api/matches/:id` (admin)
+- `POST /api/predictions` (auth)
+- `GET /api/predictions/my` (auth)
+
+**Shop:**
+- `GET /api/shop/items`
+- `POST /api/shop/buy-booster`
+- `POST /api/shop/buy-insurance`
+- `POST /api/shop/open-case`
+- `POST /api/shop/open-pending-case`
+
+**ELO / Leagues:**
+- `GET /api/elo/ranks`
+- `GET /api/elo/top`
+- `GET /api/elo/rank` (auth)
+- `GET /api/leagues`
+- `GET /api/leagues/:type/top`
+- `GET /api/leagues/my` (auth)
+
+**Withdrawals:**
+- `GET /api/withdrawals/levels` (auth)
+- `GET /api/withdrawals/my` (auth)
+- `POST /api/withdrawals/create` (auth)
+
+**Admin:**
+- `POST /api/admin/accrue`
+- `GET /api/admin/withdrawals`
+- `POST /api/admin/withdrawals/:id/pay`
+- `POST /api/admin/withdrawals/:id/reject`
+- `GET /api/admin/players`
+- `POST /api/admin/players/:username/ban`
+- `POST /api/admin/matches/:id/finish`
+
+**Reviews / Chat:**
+- `GET /api/reviews`
+- `GET /api/reviews/payouts`
+- `POST /api/reviews` (auth)
+- `GET /api/chat/messages`
+- `POST /api/chat/messages` (auth)
 
 ## 🔐 Тестовые аккаунты
 
@@ -133,13 +166,8 @@ fantasy-cs2/
 ## 📅 План развития
 - [x] Прототип (localStorage)
 - [x] Деплой фронта на Netlify
-- [x] Кейсы, скины, значки, вход по Enter
 - [x] PostgreSQL + schema
-- [x] Backend: авторизация, матчи, прогнозы
-- [ ] Backend: профиль, магазин, ELO, лиги
-- [ ] Backend: выводы
-- [ ] Backend: админка
-- [ ] Backend: чат WebSocket + отзывы
-- [ ] Переключение фронта на API
+- [x] **Backend API (все 11 роутов)**
+- [ ] Этап 4 — переключение фронта на API
 - [ ] Telegram-бот
 - [ ] Деплой на прод (Railway + РФ-хостинг)
