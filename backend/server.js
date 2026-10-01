@@ -7,6 +7,10 @@ const express = require('express');
 const cors = require('cors');
 const db = require('./db');
 const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profile');
+const shopRoutes = require('./routes/shop');
+const eloRoutes = require('./routes/elo');
+const leaguesRoutes = require('./routes/leagues');
 const matchesRoutes = require('./routes/matches');
 const predictionsRoutes = require('./routes/predictions');
 
@@ -38,6 +42,10 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/predictions', predictionsRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/shop', shopRoutes);
+app.use('/api/elo', eloRoutes);
+app.use('/api/leagues', leaguesRoutes);
 
 // ============================================================
 //  HEALTH CHECK
