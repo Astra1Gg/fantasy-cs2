@@ -11,6 +11,8 @@ const profileRoutes = require('./routes/profile');
 const shopRoutes = require('./routes/shop');
 const eloRoutes = require('./routes/elo');
 const leaguesRoutes = require('./routes/leagues');
+const withdrawalsRoutes = require('./routes/withdrawals');
+const adminRoutes = require('./routes/admin');
 const matchesRoutes = require('./routes/matches');
 const predictionsRoutes = require('./routes/predictions');
 
@@ -46,6 +48,8 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/elo', eloRoutes);
 app.use('/api/leagues', leaguesRoutes);
+app.use('/api/withdrawals', withdrawalsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ============================================================
 //  HEALTH CHECK
