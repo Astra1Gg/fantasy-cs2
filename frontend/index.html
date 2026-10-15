@@ -4,8 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0a0e1a">
-<title>🏆 FANTASY CS2 — v12.2</title>
+<title>🏆 FANTASY CS2 — v12.5</title>
 <link rel="stylesheet" href="css/style.css">
+<script>
+  // Скрываем auth-screen как можно раньше, чтобы не мигало
+  // (если есть токен — вероятно, сейчас произойдёт авто-логин)
+  if (localStorage.getItem('fs2_token')) {
+    document.addEventListener('DOMContentLoaded', function() {
+      var el = document.getElementById('auth-screen');
+      if (el) el.style.visibility = 'hidden';
+    });
+  }
+</script>
 </head>
 <body>
 
@@ -108,6 +118,7 @@
 <div class="case-prize-reveal" id="case-prize-reveal"><div class="case-prize-reveal-box" id="case-prize-reveal-box"></div></div>
 
 <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (порядок важен!) -->
+<script src="js/api.js"></script>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/achievements.js"></script>

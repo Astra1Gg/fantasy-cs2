@@ -146,15 +146,7 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ ok: false, error: 'Аккаунт заблокирован' });
     }
 
-    // Админ — старая логика с плейсхолдером, надо пропустить
-    // (пароль будет хэширован позже, пока — временная проверка)
-    let passwordMatch = false;
-    if (user.is_admin && user.password_hash.includes('placeholder')) {
-      // TODO: убрать после первого хэширования админского пароля
-      passwordMatch = (password === 'admin123');
-    } else {
-      passwordMatch = await bcrypt.compare(password, user.password_hash);
-    }
+const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordMatch) {
       return res.status(401).json({ ok: false, error: 'Неверный логин или пароль' });

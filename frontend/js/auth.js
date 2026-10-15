@@ -1,5 +1,5 @@
 // ============================================================
-//  АВТОРИЗАЦИЯ — v12.2
+//  АВТОРИЗАЦИЯ — v12.5 (Session 1 Stage 4)
 // ============================================================
 
 // ============================================================
@@ -63,17 +63,8 @@ function startTGVerify() {
   }
   if (user === ADMIN_USER) { errEl.textContent = '⚠️ Этот логин занят. Выберите другой.'; return; }
 
-  const users = loadUsers();
-  if (users[user]) { errEl.textContent = '⚠️ Пользователь с таким логином уже существует.'; return; }
-
-  const myFp = getFingerprint();
-  if (Object.entries(users).some(([n, u]) => n !== ADMIN_USER && u.fingerprint === myFp)) {
-    errEl.textContent = '⚠️ С этого устройства уже зарегистрирован аккаунт. Один аккаунт — одно устройство.';
-    return;
-  }
-
   pendingRegister = {
-    user, pass, fp: myFp,
+    user, pass, fp: getFingerprint(),
     refCode: document.getElementById('reg-ref').value.trim().toUpperCase(),
     code: Math.floor(100000 + Math.random() * 900000).toString()
   };
@@ -92,153 +83,86 @@ function backToStep1() {
 }
 
 // ============================================================
-//  РЕГИСТРАЦИЯ — шаг 2 (финал)
+//  РЕГИСТРАЦИЯ — шаг 2 (финал, через API)
 // ============================================================
-function finishRegister() {
+async function finishRegister() {
   if (!pendingRegister) return;
   const input = document.getElementById('reg-tgcode').value.trim();
   const errEl = document.getElementById('auth-err');
 
   if (!/^\d{6}$/.test(input)) {
+    errEl.style.color = '#ef4444';
     errEl.textContent = '⚠️ Введите 6 цифр — код, который прислал бот.';
     return;
   }
 
-  const users = loadUsers();
-  const fakeTgId = 'tg_' + input;
-  if (Object.entries(users).some(([n, u]) => n !== ADMIN_USER && u.tgId === fakeTgId)) {
-    errEl.textContent = '⚠️ Этот Telegram уже привязан к другому аккаунту.';
+  errEl.style.color = '#00d4ff';
+  errEl.textContent = '⏳ Создаём аккаунт...';
+
+  const res = await apiCall('/api/auth/register', 'POST', {
+    username: pendingRegister.user,
+    password: pendingRegister.pass,
+    refCode: pendingRegister.refCode || null,
+    fingerprint: pendingRegister.fp,
+    telegramId: 'tg_' + input,
+  });
+
+  if (!res.ok) {
+    errEl.style.color = '#ef4444';
+    errEl.textContent = '⚠️ ' + (res.error || 'Ошибка регистрации');
     return;
   }
 
-  const myRefCode = genRefCode();
-  const newState = {
-    user: pendingRegister.user,
-    elo: ELO_START, points: 0, fantasyPoints: 100, rubles: 0,
-    predictions: {}, history: [], streak: 0, bestStreak: 0,
-    verified: true, tgId: fakeTgId, fingerprint: pendingRegister.fp,
-    createdAt: now(), achievements: {}, prizesCount: 0,
-    killsStreak: 0, underdogWins: 0, dailyStreak: 1,
-    lastActiveDay: todayStr(), lowEloReached: false,
-    bonuses: { boosters: [], insurance: [], pendingCases: [] },
-    cosmetics: [], avatar: 'default', frame: 'none',
-    activeNickEffect: null, activeFrameEffect: 'none',
-    lastWheelSpin: null, wheelReminderClosed: false,
-    totalSpins: 0, casesOpened: 0,
-    refCode: myRefCode, referredBy: null, referrals: [],
-    chatMessages: 0, rubHistory: [],
-    leagues: { daily: { points: 0 }, weekly: { points: 0 }, monthly: { points: 0 } },
-    specialLeagues: {}, lastActionTimes: [],
-    bestEloReached: ELO_START, eloRewardsClaimed: {},
-    weeklyRewardClaimed: null, monthlyRewardClaimed: null,
-    activityActions: 0, withdrawCount: 0, withdrawals: [],
-    referralStages: { full: 0 }, referralTracking: {},
-    notifications: [],
-  };
-
-  // Обработка реферального кода
-  if (pendingRegister.refCode) {
-    const refUser = Object.entries(users).find(([n, u]) => u.refCode === pendingRegister.refCode);
-    if (refUser && refUser[1].fingerprint !== pendingRegister.fp) {
-      const [refName, refState] = refUser;
-      newState.referredBy = refName;
-      if (!refState.referrals) refState.referrals = [];
-      if (!refState.referralTracking) refState.referralTracking = {};
-      refState.referrals.push(pendingRegister.user);
-      refState.referralTracking[pendingRegister.user] = {
-        registered: true, fivePredictions: false,
-        firstWithdraw: false, secondWithdraw: false, thirdWithdraw: false,
-        totalEarned: 50
-      };
-      refState.fantasyPoints = (refState.fantasyPoints || 0) + 50;
-      users[refName] = refState;
-    }
-  }
-
-  users[pendingRegister.user] = newState;
-  localStorage.setItem('fs2_users', JSON.stringify(users));
-  localStorage.setItem('fs2_pass_' + pendingRegister.user, pendingRegister.pass);
+  saveToken(res.token);
+  const userState = mapUserFromApi(res.user);
+  await loadAllGameData(userState);
 
   toast('✅ Аккаунт создан! Добро пожаловать!', '#10b981');
-  const u = pendingRegister.user;
   pendingRegister = null;
-  enterGame(u, newState);
+  errEl.textContent = '';
+  enterGame(res.user.username, userState);
 }
+
 // ============================================================
-//  ВХОД
+//  ВХОД (через API)
 // ============================================================
-function doLogin() {
+async function doLogin() {
   const user = document.getElementById('login-user').value.trim();
   const pass = document.getElementById('login-pass').value;
   const errEl = document.getElementById('auth-err');
 
   if (!user || !pass) { errEl.textContent = '⚠️ Введите логин и пароль'; return; }
 
-  // === ВХОД АДМИНА ===
-  if (user === ADMIN_USER) {
-    if (pass !== ADMIN_PASS) {
-      errEl.textContent = '⚠️ Неверный пароль администратора.';
-      return;
-    }
-    const users = loadUsers();
-    let adminState = users[ADMIN_USER];
-    if (!adminState) {
-      adminState = {
-        user: ADMIN_USER, elo: ELO_START, points: 0, fantasyPoints: 99999, rubles: 0,
-        predictions: {}, history: [], streak: 0, bestStreak: 0, verified: true,
-        tgId: 'admin', fingerprint: 'admin', createdAt: now(),
-        achievements: {}, prizesCount: 0, killsStreak: 0, underdogWins: 0,
-        dailyStreak: 1, lastActiveDay: todayStr(), lowEloReached: false,
-        bonuses: { boosters: [], insurance: [], pendingCases: [] }, cosmetics: [],
-        avatar: 'default', frame: 'none', activeNickEffect: null, activeFrameEffect: 'none',
-        lastWheelSpin: null, wheelReminderClosed: false, totalSpins: 0, casesOpened: 0,
-        refCode: 'ADMIN1', referredBy: null, referrals: [], chatMessages: 0, rubHistory: [],
-        leagues: { daily: { points: 0 }, weekly: { points: 0 }, monthly: { points: 0 } },
-        specialLeagues: {}, lastActionTimes: [], bestEloReached: ELO_START,
-        eloRewardsClaimed: {}, weeklyRewardClaimed: null, monthlyRewardClaimed: null,
-        activityActions: 0, withdrawCount: 0, withdrawals: [],
-        referralStages: { full: 0 }, referralTracking: {}, notifications: [],
-      };
-    }
-    users[ADMIN_USER] = adminState;
-    localStorage.setItem('fs2_users', JSON.stringify(users));
-    toast('👑 Добро пожаловать, Админ!', '#ffd700');
-    enterGame(ADMIN_USER, adminState);
+  errEl.style.color = '#00d4ff';
+  errEl.textContent = '⏳ Проверяем...';
+
+  const res = await apiCall('/api/auth/login', 'POST', { username: user, password: pass });
+
+  if (!res.ok) {
+    errEl.style.color = '#ef4444';
+    errEl.textContent = '⚠️ ' + (res.error || 'Ошибка входа');
     return;
   }
 
-  // === ВХОД ИГРОКА ===
-  const users = loadUsers();
-  const savedPass = localStorage.getItem('fs2_pass_' + user);
+  saveToken(res.token);
 
-  if (!users[user]) {
-    errEl.textContent = '⚠️ Пользователь с таким логином не найден. Проверьте раскладку и Caps Lock.';
-    return;
-  }
-  if (users[user].banned) {
-    errEl.textContent = '🚫 Этот аккаунт заблокирован. Причина: нарушение правил проекта.';
-    return;
-  }
-  if (savedPass !== pass) {
-    errEl.textContent = '⚠️ Неверный пароль. Проверьте раскладку и Caps Lock.';
-    return;
-  }
+  const userState = mapUserFromApi(res.user);
+  await loadAllGameData(userState);
 
+  errEl.textContent = '';
   toast('✅ Привет, ' + user + '!', '#10b981');
-  enterGame(user, users[user]);
+  enterGame(res.user.username, userState);
 }
 
 // ============================================================
-//  ВХОД В ИГРУ (главная инициализация)
+//  ВХОД В ИГРУ
 // ============================================================
 function enterGame(user, userState) {
   currentUser = user;
   localStorage.setItem('fs2_last_user', user);
+
   state = migrateUser(userState);
-  matches = loadMatches();
   leagueSettings = loadLeagueSettings();
-  reviews = loadReviews();
-  chatMessages = JSON.parse(localStorage.getItem('fs2_chat') || '[]');
 
   // Ежедневный вход — бонус
   const today = todayStr();
@@ -252,9 +176,10 @@ function enterGame(user, userState) {
     state.lastActiveDay = today;
     state.fantasyPoints = (state.fantasyPoints || 0) + 5;
     state.activityActions = (state.activityActions || 0) + 1;
+    apiCall('/api/profile/me', 'PATCH', mapUserToApi(state)).catch(() => {});
   }
 
-  // Переключение экранов
+  // UI
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
   document.getElementById('header-admin').classList.toggle('hidden', !isAdmin());
@@ -266,13 +191,12 @@ function enterGame(user, userState) {
   // Проверки при входе
   checkAchievements();
   checkEloRewards();
-  checkActivityRewards();
+  // checkActivityRewards();   // временно отключено — вернём в Сессии 3
   checkAutoLiveTransition();
   checkAutoRejectWithdrawals();
-  checkReferralProgress();
+  // checkReferralProgress();  // временно отключено — нужен список всех юзеров
   checkUnseenNotifications();
 
-  saveState();
   maybeShowWheelReminder();
   startLeagueTimer();
   startAutoLiveCheck();
@@ -280,50 +204,89 @@ function enterGame(user, userState) {
 }
 
 // ============================================================
-//  МИГРАЦИЯ СТАРЫХ АККАУНТОВ
+//  МИГРАЦИЯ — гарантируем наличие ВСЕХ полей
 // ============================================================
 function migrateUser(u) {
+  if (!u) u = {};
   if (u.elo === undefined) u.elo = ELO_START;
-  if (!u.achievements) u.achievements = {};
-  if (!u.leagues) u.leagues = { daily: { points: 0 }, weekly: { points: 0 }, monthly: { points: 0 } };
-  if (u.prizesCount === undefined) u.prizesCount = 0;
+  if (u.bestElo === undefined) u.bestElo = u.elo || ELO_START;
+  if (u.bestEloReached === undefined) u.bestEloReached = u.bestElo || ELO_START;
+  if (u.fantasyPoints === undefined) u.fantasyPoints = 0;
+  if (u.rubles === undefined) u.rubles = 0;
+  if (u.streak === undefined) u.streak = 0;
+  if (u.bestStreak === undefined) u.bestStreak = 0;
   if (u.killsStreak === undefined) u.killsStreak = 0;
   if (u.underdogWins === undefined) u.underdogWins = 0;
   if (u.dailyStreak === undefined) u.dailyStreak = 1;
   if (u.lastActiveDay === undefined) u.lastActiveDay = todayStr();
   if (u.lowEloReached === undefined) u.lowEloReached = false;
-  if (u.fantasyPoints === undefined) u.fantasyPoints = 0;
-  if (u.rubles === undefined) u.rubles = 0;
-  if (!u.bonuses) u.bonuses = { boosters: [], insurance: [], pendingCases: [] };
-  if (!u.bonuses.pendingCases) u.bonuses.pendingCases = [];
-  if (!u.bonuses.boosters) u.bonuses.boosters = [];
-  if (!u.bonuses.insurance) u.bonuses.insurance = [];
-  if (!u.cosmetics) u.cosmetics = [];
+  if (u.totalPredictions === undefined) u.totalPredictions = 0;
+  if (u.correctPredictions === undefined) u.correctPredictions = 0;
+  if (u.casesOpened === undefined) u.casesOpened = 0;
+  if (u.totalSpins === undefined) u.totalSpins = 0;
+  if (u.activityActions === undefined) u.activityActions = 0;
+  if (u.chatMessages === undefined) u.chatMessages = 0;
+  if (u.withdrawCount === undefined) u.withdrawCount = 0;
+  if (u.prizesCount === undefined) u.prizesCount = 0;
+
+  // Косметика
   if (!u.avatar) u.avatar = 'default';
   if (!u.frame) u.frame = 'none';
   if (u.activeNickEffect === undefined) u.activeNickEffect = null;
   if (u.activeFrameEffect === undefined) u.activeFrameEffect = 'none';
+  if (!u.activeBadges) u.activeBadges = {};
+  if (!u.cosmetics) u.cosmetics = [];
+  if (!u.inventory) u.inventory = [];
+
+  // Бонусы
+  if (!u.bonuses) u.bonuses = {};
+  if (!u.bonuses.boosters) u.bonuses.boosters = [];
+  if (!u.bonuses.insurance) u.bonuses.insurance = [];
+  if (!u.bonuses.pendingCases) u.bonuses.pendingCases = [];
+
+  // Флаги
+  if (u.verified === undefined) u.verified = false;
+  if (u.banned === undefined) u.banned = false;
+  if (u.isAdmin === undefined) u.isAdmin = false;
+
+  // Рефералы
+  if (!u.refCode) u.refCode = genRefCode();
+  if (u.referredBy === undefined) u.referredBy = null;
+  if (!u.referrals) u.referrals = [];
+  if (!u.referralTracking) u.referralTracking = {};
+  if (!u.referralStages) u.referralStages = { full: 0 };
+
+  // Прогнозы
+  if (!u.predictions) u.predictions = {};
+  if (!u.history) u.history = [];
+
+  // Выводы
+  if (!u.withdrawals) u.withdrawals = [];
+  if (!u.rubHistory) u.rubHistory = [];
+
+  // Лиги — ВАЖНО: не должно быть undefined внутри
+  if (!u.leagues) u.leagues = {};
+  if (!u.leagues.daily)   u.leagues.daily   = { points: 0 };
+  if (!u.leagues.weekly)  u.leagues.weekly  = { points: 0 };
+  if (!u.leagues.monthly) u.leagues.monthly = { points: 0 };
+  if (u.leagues.daily.points === undefined)   u.leagues.daily.points = 0;
+  if (u.leagues.weekly.points === undefined)  u.leagues.weekly.points = 0;
+  if (u.leagues.monthly.points === undefined) u.leagues.monthly.points = 0;
+  if (!u.specialLeagues) u.specialLeagues = {};
+
+  // Достижения и прочее — ВСЁ должно быть объектом, не undefined
+  if (!u.achievements) u.achievements = {};
+  if (!u.eloRewardsClaimed) u.eloRewardsClaimed = {};
+  if (!u.notifications) u.notifications = [];
+  if (!u.lastActionTimes) u.lastActionTimes = [];
+
+  // Время колеса
   if (u.lastWheelSpin === undefined) u.lastWheelSpin = null;
   if (u.wheelReminderClosed === undefined) u.wheelReminderClosed = false;
-  if (u.totalSpins === undefined) u.totalSpins = 0;
-  if (u.casesOpened === undefined) u.casesOpened = 0;
-  if (!u.refCode) u.refCode = genRefCode();
-  if (!u.referrals) u.referrals = [];
-  if (u.referredBy === undefined) u.referredBy = null;
-  if (u.chatMessages === undefined) u.chatMessages = 0;
-  if (!u.rubHistory) u.rubHistory = [];
-  if (!u.specialLeagues) u.specialLeagues = {};
-  if (!u.lastActionTimes) u.lastActionTimes = [];
-  if (u.bestEloReached === undefined) u.bestEloReached = u.elo || ELO_START;
-  if (!u.eloRewardsClaimed) u.eloRewardsClaimed = {};
   if (u.weeklyRewardClaimed === undefined) u.weeklyRewardClaimed = null;
   if (u.monthlyRewardClaimed === undefined) u.monthlyRewardClaimed = null;
-  if (u.activityActions === undefined) u.activityActions = 0;
-  if (u.withdrawCount === undefined) u.withdrawCount = 0;
-  if (!u.withdrawals) u.withdrawals = [];
-  if (!u.referralStages) u.referralStages = { full: 0 };
-  if (!u.referralTracking) u.referralTracking = {};
-  if (!u.notifications) u.notifications = [];
+  if (u.createdAt === undefined) u.createdAt = Date.now();
+
   return u;
 }
 
@@ -331,9 +294,17 @@ function migrateUser(u) {
 //  ВЫХОД
 // ============================================================
 function logout() {
-  saveState();
+  if (currentUser && state && state.user) {
+    apiCall('/api/profile/me', 'PATCH', mapUserToApi(state)).catch(() => {});
+  }
+
+  clearToken();
   currentUser = null;
   state = {};
+  matches = [];
+  chatMessages = [];
+  reviews = [];
+
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('main-screen').classList.add('hidden');
   toast('👋 До встречи!', '#8b95a8');
@@ -354,11 +325,11 @@ function updateHeader() {
 
   document.getElementById('header-points').textContent = fmt(state.fantasyPoints || 0);
 
-  const d = state.leagues?.daily?.points || 0;
-  const w = state.leagues?.weekly?.points || 0;
-  const m = state.leagues?.monthly?.points || 0;
-  document.getElementById('tt-daily').textContent = fmtSigned(d);
-  document.getElementById('tt-weekly').textContent = fmtSigned(w);
+  const d = (state.leagues && state.leagues.daily   && state.leagues.daily.points)   || 0;
+  const w = (state.leagues && state.leagues.weekly  && state.leagues.weekly.points)  || 0;
+  const m = (state.leagues && state.leagues.monthly && state.leagues.monthly.points) || 0;
+  document.getElementById('tt-daily').textContent   = fmtSigned(d);
+  document.getElementById('tt-weekly').textContent  = fmtSigned(w);
   document.getElementById('tt-monthly').textContent = fmtSigned(m);
 
   const rubPill = document.getElementById('header-rub-pill');
@@ -432,44 +403,33 @@ function showRejectedNotification(n) {
     </div>`;
   document.getElementById('modal-bg').classList.add('show');
 }
+
 // ============================================================
 //  ВХОД/РЕГИСТРАЦИЯ ПО ENTER
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-  // Вход: Enter в поле логина или пароля → doLogin()
   ['login-user', 'login-pass'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          doLogin();
-        }
+        if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
       });
     }
   });
 
-  // Регистрация, шаг 1: Enter в логине/пароле/капче → startTGVerify()
   ['reg-user', 'reg-pass', 'reg-ref', 'captcha-a'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          startTGVerify();
-        }
+        if (e.key === 'Enter') { e.preventDefault(); startTGVerify(); }
       });
     }
   });
 
-  // Регистрация, шаг 2: Enter в поле кода → finishRegister()
   const tgCodeEl = document.getElementById('reg-tgcode');
   if (tgCodeEl) {
     tgCodeEl.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        finishRegister();
-      }
+      if (e.key === 'Enter') { e.preventDefault(); finishRegister(); }
     });
   }
 });

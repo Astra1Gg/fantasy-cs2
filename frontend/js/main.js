@@ -1,12 +1,11 @@
 // ============================================================
-//  MAIN — точка входа и роутер страниц — v12.2
+//  MAIN — точка входа и роутер страниц — v12.5 (Session 1 Stage 4)
 // ============================================================
 
 // ============================================================
 //  РОУТЕР — переключение страниц
 // ============================================================
 function renderPage(page) {
-  // Страховка: если leagueSettings пустой — грузим с диска
   if (!leagueSettings || !leagueSettings.daily || !leagueSettings.weekly || !leagueSettings.monthly) {
     leagueSettings = loadLeagueSettings();
   }
@@ -14,33 +13,36 @@ function renderPage(page) {
   const content = document.getElementById('content');
   if (!content) return;
 
-  switch (page) {
-    case 'matches':  content.innerHTML = renderMatchesPage(); break;
-    case 'live':     content.innerHTML = renderLivePage(); break;
-    case 'league':   content.innerHTML = renderLeaguePage(); break;
-    case 'elo':      content.innerHTML = renderEloPage(); break;
-    case 'wheel':    content.innerHTML = renderWheelPage(); break;
-    case 'shop':     content.innerHTML = renderShopPage(); break;
-    case 'profile':  content.innerHTML = renderProfilePage(); break;
-    case 'faq':      content.innerHTML = renderFaqPage(); break;
-    case 'reviews':  content.innerHTML = renderReviewsPage(); break;
-    case 'admin':    content.innerHTML = renderAdminPage(); break;
-    default:         content.innerHTML = renderMatchesPage();
+  try {
+    switch (page) {
+      case 'matches':  content.innerHTML = renderMatchesPage(); break;
+      case 'live':     content.innerHTML = renderLivePage(); break;
+      case 'league':   content.innerHTML = renderLeaguePage(); break;
+      case 'elo':      content.innerHTML = renderEloPage(); break;
+      case 'wheel':    content.innerHTML = renderWheelPage(); break;
+      case 'shop':     content.innerHTML = renderShopPage(); break;
+      case 'profile':  content.innerHTML = renderProfilePage(); break;
+      case 'faq':      content.innerHTML = renderFaqPage(); break;
+      case 'reviews':  content.innerHTML = renderReviewsPage(); break;
+      case 'admin':    content.innerHTML = renderAdminPage(); break;
+      default:         content.innerHTML = renderMatchesPage();
+    }
+  } catch (err) {
+    console.error('renderPage error on page=' + page + ':', err);
+    content.innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;">⚠️ Ошибка загрузки страницы: ' + page + '<br><small style="color:#8b95a8;">Проверьте Console</small></div>';
   }
 
   saveState();
 
-  // Напоминание о колесе (везде, кроме самого колеса)
   if (page !== 'wheel') {
-    maybeShowWheelReminder();
+    try { maybeShowWheelReminder(); } catch(e) {}
   } else {
     const el = document.getElementById('wheel-reminder');
     if (el) el.remove();
   }
 
-  // Обновление чата на страницах, где он есть
   if (page === 'matches' || page === 'live') {
-    setTimeout(() => updateAllChats(), 50);
+    setTimeout(() => { try { updateAllChats(); } catch(e) {} }, 50);
   }
 }
 
@@ -69,7 +71,6 @@ function closeModal() {
   if (el) el.classList.remove('show');
 }
 
-// Закрытие по клику на фон
 document.addEventListener('DOMContentLoaded', () => {
   const bg = document.getElementById('modal-bg');
   if (bg) {
@@ -78,14 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Закрытие по ESC
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeModal();
   });
 });
 
 // ============================================================
-//  НАВИГАЦИЯ — обработчик кнопок в шапке
+//  НАВИГАЦИЯ
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -100,18 +100,38 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 //  ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
 // ============================================================
-window.addEventListener('load', () => {
-  // Восстанавливаем последний логин
+window.addEventListener('load', async () => {
+  const authScreen = document.getElementById('auth-screen');
+
+  // Если есть токен — прячем auth до ответа tryAutoLogin (чтобы не мигало)
+  if (getToken() && authScreen) {
+    authScreen.style.visibility = 'hidden';
+  }
+
+  // 1. Авто-логин
+  let autoLoginOk = false;
+  try {
+    autoLoginOk = await tryAutoLogin();
+  } catch (err) {
+    console.error('tryAutoLogin error:', err);
+  }
+
+  if (autoLoginOk) {
+    if (authScreen) authScreen.style.visibility = '';
+    return;
+  }
+
+  // 2. Показываем auth-screen
+  if (authScreen) authScreen.style.visibility = '';
+
   const last = localStorage.getItem('fs2_last_user');
   if (last) {
     const el = document.getElementById('login-user');
     if (el) el.value = last;
   }
 
-  // Стартовая капча
   generateCaptcha();
 
-  // Обработка реферальной ссылки ?ref=XXXXXX
   const params = new URLSearchParams(location.search);
   const ref = params.get('ref');
   if (ref) {
@@ -123,14 +143,13 @@ window.addEventListener('load', () => {
     }, 100);
   }
 
-  // Авто-обновление шапки раз в 30 сек (на случай смены баланса из другой вкладки)
   setInterval(() => {
     if (currentUser) updateHeader();
   }, 30000);
 });
 
 // ============================================================
-//  ЗАЩИТА ОТ ДВОЙНОГО КЛИКА (общая утилита)
+//  ЗАЩИТА ОТ ДВОЙНОГО КЛИКА
 // ============================================================
 (function() {
   let lastClickTime = 0;
@@ -152,10 +171,10 @@ window.addEventListener('load', () => {
 })();
 
 // ============================================================
-//  ПРИВЕТСТВИЕ В КОНСОЛИ
+//  ПРИВЕТСТВИЕ
 // ============================================================
 console.log(
-  '%c🏆 FANTASY CS2 %cv12.2',
+  '%c🏆 FANTASY CS2 %cv12.5',
   'background: linear-gradient(90deg, #00d4ff, #7c3aed); color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: 900; font-size: 16px;',
   'color: #8b95a8; font-size: 12px; margin-left: 6px;'
 );

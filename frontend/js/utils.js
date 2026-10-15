@@ -1,5 +1,5 @@
 // ============================================================
-//  УТИЛИТЫ — v12.2
+//  УТИЛИТЫ — v12.5 (Session 1 Stage 4)
 // ============================================================
 
 // Форматирование чисел
@@ -56,18 +56,24 @@ function getEloRank(elo) {
   return ELO_RANKS.find(r => elo >= r.min && elo < r.max) || ELO_RANKS[ELO_RANKS.length - 1];
 }
 
-// Пользователи — сохранение/загрузка
-function saveUsers() {
-  if (!currentUser) return;
-  const users = JSON.parse(localStorage.getItem('fs2_users') || '{}');
-  users[currentUser] = state;
-  localStorage.setItem('fs2_users', JSON.stringify(users));
+// ------------------------------------------------------------
+//  USERS (теперь через API)
+// ------------------------------------------------------------
+async function saveUsers() {
+  if (!currentUser || !state || !state.user) return;
+  const res = await apiCall('/api/profile/me', 'PATCH', mapUserToApi(state));
+  if (!res.ok) {
+    console.warn('saveUsers failed:', res.error);
+  }
 }
 function loadUsers() {
-  return JSON.parse(localStorage.getItem('fs2_users') || '{}');
+  // Кеш всех юзеров. Пока пустой — заполним в Сессии 3, когда подключим рейтинг.
+  return window._usersCache || {};
 }
 
-// Матчи
+// ------------------------------------------------------------
+//  МАТЧИ (пока localStorage, потом API)
+// ------------------------------------------------------------
 function saveMatches() {
   localStorage.setItem('fs2_matches', JSON.stringify(matches));
 }
@@ -77,7 +83,9 @@ function loadMatches() {
   return JSON.parse(JSON.stringify(DEFAULT_MATCHES));
 }
 
-// Настройки лиг
+// ------------------------------------------------------------
+//  НАСТРОЙКИ ЛИГ
+// ------------------------------------------------------------
 function saveLeagueSettings() {
   localStorage.setItem('fs2_league_settings', JSON.stringify(leagueSettings));
 }
@@ -100,25 +108,21 @@ function loadLeagueSettings() {
   };
 }
 
-// Отзывы
+// ------------------------------------------------------------
+//  ОТЗЫВЫ
+// ------------------------------------------------------------
 function saveReviews() {
   localStorage.setItem('fs2_reviews', JSON.stringify(reviews));
 }
 function loadReviews() {
   const s = localStorage.getItem('fs2_reviews');
   if (s) { try { return JSON.parse(s); } catch(e) {} }
-  return [{
-    id: 'r1',
-    author: 'admin',
-    text: '🎉 Добро пожаловать в Fantasy CS2!\n\nПриветственный бонус 100 🟡 новым игрокам. Делайте прогнозы, поднимайте ELO, забирайте призы. Удачи!',
-    createdAt: now() - 86400000 * 3,
-    pinned: true,
-    isAdmin: true,
-    type: 'text'
-  }];
+  return [];
 }
 
-// Общее сохранение
+// ------------------------------------------------------------
+//  ОБЩЕЕ СОХРАНЕНИЕ
+// ------------------------------------------------------------
 function saveState() {
   saveUsers();
   saveMatches();
@@ -126,9 +130,11 @@ function saveState() {
   saveReviews();
 }
 
-// Проверки
+// ------------------------------------------------------------
+//  ПРОВЕРКИ
+// ------------------------------------------------------------
 function isAdmin() {
-  return currentUser === ADMIN_USER;
+  return !!(state && state.isAdmin);
 }
 function genRefCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -151,7 +157,9 @@ function getFingerprint() {
   return 'fp_' + Math.abs(hash).toString(36);
 }
 
-// Лиги — проверки
+// ------------------------------------------------------------
+//  ЛИГИ — проверки
+// ------------------------------------------------------------
 function getLeagueEndTime(type) {
   const s = leagueSettings[type];
   if (!s) return now();
@@ -204,23 +212,24 @@ function getWithdrawStatus(w) {
   return { label: '⏳ В обработке', color: '#00d4ff' };
 }
 
-// Escape HTML (защита от XSS в чате)
+// Escape HTML
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
+
 // ============================================================
-//  ПРАЗДНИЧНАЯ АНИМАЦИЯ (конфетти + фейерверк)
+//  ПРАЗДНИЧНАЯ АНИМАЦИЯ
 // ============================================================
 function showCelebration() {
   const overlay = document.getElementById('celebration-overlay');
+  if (!overlay) return;
   overlay.classList.add('show');
   setTimeout(() => overlay.classList.remove('show'), 2000);
 
   const colors = ['#ffd700', '#ff0080', '#00ff88', '#00aaff', '#ff00ff', '#ffffff', '#10b981'];
 
-  // Падающее конфетти
   for (let i = 0; i < 200; i++) {
     setTimeout(() => {
       const c = document.createElement('div');
@@ -236,7 +245,6 @@ function showCelebration() {
     }, i * 15);
   }
 
-  // Фейерверк из центра
   for (let i = 0; i < 3; i++) {
     setTimeout(() => {
       const cx = window.innerWidth / 2;
@@ -259,7 +267,7 @@ function showCelebration() {
 }
 
 // ============================================================
-//  ДОСТИЖЕНИЯ — показ уведомлений и проверки
+//  ДОСТИЖЕНИЯ
 // ============================================================
 function showAchievementToast(ach) {
   const el = document.createElement('div');
@@ -276,6 +284,7 @@ function showAchievementToast(ach) {
 }
 
 function checkAchievements() {
+  if (!state) return;
   if (!state.achievements) state.achievements = {};
   const newlyUnlocked = [];
   for (const ach of ACHIEVEMENTS) {
@@ -301,6 +310,7 @@ function checkAchievements() {
 //  НАГРАДЫ ЗА ELO-РАНГ
 // ============================================================
 function checkEloRewards() {
+  if (!state) return;
   if (!state.eloRewardsClaimed) state.eloRewardsClaimed = {};
   for (const r of ELO_RANKS) {
     if (state.elo >= r.min && !state.eloRewardsClaimed[r.name]) {
@@ -317,40 +327,23 @@ function checkEloRewards() {
 }
 
 // ============================================================
-//  НАГРАДЫ ЗА АКТИВНОСТЬ (недельная, месячная)
+//  НАГРАДЫ ЗА АКТИВНОСТЬ (пока отключены — вернём в Сессии 3)
 // ============================================================
 function checkActivityRewards() {
-  const currentWeek = weekStr();
-  if (state.weeklyRewardClaimed !== currentWeek && !isAdmin()) {
-    if ((state.activityActions || 0) >= 20) {
-      state.weeklyRewardClaimed = currentWeek;
-      state.fantasyPoints = (state.fantasyPoints || 0) + 100;
-      state.bonuses.pendingCases = state.bonuses.pendingCases || [];
-      state.bonuses.pendingCases.push('small');
-      toast('🏆 Топ активности за неделю! +100 🟡 + Малый кейс', '#10b981');
-      saveUsers();
-    }
-  }
-  const currentMonth = monthStr();
-  if (state.monthlyRewardClaimed !== currentMonth && !isAdmin()) {
-    if ((state.activityActions || 0) >= 50) {
-      state.monthlyRewardClaimed = currentMonth;
-      state.fantasyPoints = (state.fantasyPoints || 0) + 500;
-      state.bonuses.pendingCases = state.bonuses.pendingCases || [];
-      state.bonuses.pendingCases.push('medium');
-      toast('🌟 Топ активности за месяц! +500 🟡 + Средний кейс', '#ffd700');
-      saveUsers();
-    }
-  }
+  // TODO: перенести на сервер, чтобы не дублировать награды при перезагрузке
+  if (!state || isAdmin()) return;
+  // Заглушка
+  return;
 }
 
 // ============================================================
 //  АВТО-ПЕРЕХОД МАТЧЕЙ В LIVE
 // ============================================================
 function checkAutoLiveTransition() {
+  if (!matches || !matches.length) return;
   let changed = false;
   matches.forEach(m => {
-    if (m.status === 'upcoming') {
+    if (m.status === 'upcoming' && m.date) {
       const matchTime = new Date(m.date.replace(' ', 'T')).getTime();
       if (matchTime <= now()) {
         m.status = 'live';
@@ -365,68 +358,21 @@ function checkAutoLiveTransition() {
 }
 
 // ============================================================
-//  РЕФЕРАЛЫ — проверка прогресса
+//  РЕФЕРАЛЫ — проверка прогресса (пока отключено)
 // ============================================================
 function checkReferralProgress() {
-  if (!currentUser || isAdmin()) return;
-  const users = loadUsers();
-  const me = users[currentUser];
-  if (!me || !me.referralTracking) return;
-  let changed = false;
-  Object.keys(me.referralTracking).forEach(refName => {
-    const ref = users[refName];
-    if (!ref) return;
-    const track = me.referralTracking[refName];
-    const refPredictions = (ref.history || []).length;
-    const refWithdrawCount = ref.withdrawCount || 0;
-
-    if (!track.fivePredictions && refPredictions >= 5) {
-      track.fivePredictions = true;
-      me.fantasyPoints = (me.fantasyPoints || 0) + 250;
-      track.totalEarned = (track.totalEarned || 50) + 250;
-      toast(`🎉 Друг ${refName} сделал 5 прогнозов! +250 🟡`, '#10b981');
-      changed = true;
-    }
-    if (!track.firstWithdraw && refWithdrawCount >= 1) {
-      track.firstWithdraw = true;
-      me.fantasyPoints = (me.fantasyPoints || 0) + 400;
-      track.totalEarned = (track.totalEarned || 0) + 400;
-      toast(`🎉 Друг ${refName} сделал первый вывод! +400 🟡`, '#10b981');
-      changed = true;
-    }
-    if (!track.secondWithdraw && refWithdrawCount >= 2) {
-      track.secondWithdraw = true;
-      me.bonuses.pendingCases = me.bonuses.pendingCases || [];
-      me.bonuses.pendingCases.push('medium');
-      track.totalEarned = (track.totalEarned || 0) + 500;
-      toast(`🎉 Друг ${refName} сделал второй вывод! 💎 Средний кейс`, '#a78bfa');
-      changed = true;
-    }
-    if (!track.thirdWithdraw && refWithdrawCount >= 3) {
-      track.thirdWithdraw = true;
-      me.bonuses.pendingCases = me.bonuses.pendingCases || [];
-      me.bonuses.pendingCases.push('large');
-      track.totalEarned = (track.totalEarned || 0) + 1000;
-      me.referralStages = me.referralStages || { full: 0 };
-      me.referralStages.full = (me.referralStages.full || 0) + 1;
-      toast(`🎉 Друг ${refName} сделал третий вывод! 👑 Большой кейс`, '#ffd700');
-      changed = true;
-    }
-  });
-  if (changed) {
-    localStorage.setItem('fs2_users', JSON.stringify(users));
-    state = me;
-    updateHeader();
-  }
+  // TODO: включим, когда подключим API для списка всех юзеров
+  return;
 }
 
 // ============================================================
-//  АВТО-ОТКЛОНЕНИЕ ЗАЯВОК (72 часа)
+//  АВТО-ОТКЛОНЕНИЕ ЗАЯВОК (72 часа) — на клиенте
 // ============================================================
 function checkAutoRejectWithdrawals() {
+  if (!state || !state.withdrawals) return;
   const cutoff = now() - WITHDRAW_AUTO_REJECT_HOURS * 3600000;
   let changed = false;
-  (state.withdrawals || []).forEach(w => {
+  state.withdrawals.forEach(w => {
     if (w.status === 'pending' && w.createdAt < cutoff) {
       w.status = 'rejected';
       w.rejectedReason = 'Авто-отклонение: превышено время ожидания';
@@ -453,14 +399,14 @@ function checkAutoRejectWithdrawals() {
 }
 
 // ============================================================
-//  ТАЙМЕРЫ И АВТО-ПРОВЕРКИ (запускаются при входе)
+//  ТАЙМЕРЫ
 // ============================================================
 function startAutoLiveCheck() {
   if (window._autoLiveTimer) clearInterval(window._autoLiveTimer);
   window._autoLiveTimer = setInterval(() => {
     if (currentUser) {
       checkAutoLiveTransition();
-      checkReferralProgress();
+      // checkReferralProgress();  // отключено до Сессии 3
     }
   }, 30000);
 }
